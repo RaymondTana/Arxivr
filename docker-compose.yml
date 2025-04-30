@@ -1,0 +1,23 @@
+version: "3.9"
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+  web:
+    image: php:8.3-apache
+    volumes:
+      - ./web:/var/www/html:ro
+    env_file: .env
+    ports: ["8080:80"]
+    depends_on: [db]
+  fetcher:
+    build: ./fetcher
+    env_file: .env
+    volumes:
+      - ./shared/queue:/queue
+    depends_on: [db]
+volumes:
+  pgdata:
