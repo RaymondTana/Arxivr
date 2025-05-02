@@ -1,23 +1,25 @@
 # Arxivr
-We implement a simple internet archiver. A user can interact with a form to either instruct the tool to take a snapshot of a given URL and all its assets, or request to rebuild a given site from one of its snapshots in the archive.
+We implement a simple internet archiver. This is a lightweight, self-hosted internet archiver inspired by the Internet Archive's Wayback Machine. The main actions permitted include **taking snapshots** of URLs with their linked assets, **browsing** a timeline of stored snapshots, and **revisiting** past versions of pages from the local archive.
 
-The tool is built using a combination of PHP, Python, and PostgreSQL. 
+The project is built using PHP (frontend and routing), Python (background worker), and PostgreSQL (data storage).
 
-This is a major work-in-progress. 
+*Note*: this is a work-in-progress.
 
-## General Structure
+## General Architecture
 
-**When the user submits a URL for archiving**:
-1. A POST request is sent through `/archive.php` passing that URL.
-2. This PHP script validates the string, retrieves any pre-existing page ID, inserts a row into the database `pages` with a new `page_id`, and appends a JSON job to `/shared/queue/jobs`, so the user will see that the request is pending.
-3. In the backend, the Python fetcher notices the new line in the queue file. The raw HTML is requests for this URL, and the other static assets are discovered. 
-4. Each asset is then fetched, written into an in-memory ZIP archive, which preserves the relative paths. Any failures here are logged. 
-5. A row is added into the database `snapshots` including the `page_id` (a foreign key), `html` (raw page source), `assets_zip` (BYTEA of the ZIP file), `fetched_at`, and `status`. 
-6. The PHP script `web/index.php` will join the latest snapshots to `pages`. 
-
-**When the user requests to view a snapshot**
-1. The PHP script `web/snapshot.php` looks up the `html` by `id`, and will stream the saved HTML back to the user. The browser should be able to download it from the live origin for fast replay.
-2. We could instead unzip the assets and set up points to a local handler of these assets, using some `assets.php` to stream the requested file from storage to local... 
+1. A POST request is sent to `/archive.php` with the submitted URL.
+2. The PHP script validates the URL, inserts it into the pages table (or fetches its existing `page_id`), and appends a new JSON job (`{"page_id": ..., "url": "..."}`) to the queue file at `/shared/queue/jobs`.
+3. The fetcher, a long-running background process writte in Python, continuously monitors the queue. When it detects a new job:
+    - It fetches the raw HTML of the URL using requests, and
+    - It parses the HTML to discover linked static assets (`<img>`, `<script>`, `<link>`, etc.).
+4. Each asset is downloaded and written into an in-memory ZIP archive, preserving relative file paths. We log any fetching failures.
+5. A new row is inserted into the snapshots table containing:
+   - `page_id` (foreign key to `pages`)
+   - `html` (the full HTML source)
+   - `assets_zip` (a `BYTEA` blob of the zipped assets)
+   - `fetched_at` timestamp
+   - `status` (e.g. `'ok'`, `'error'`, `'robots_blocked'`)
+6. `/web/index.php` lists all known pages and their most recent snapshots. `/web/timeline.php` provides an interactive timeline of captures. Clicking any point navigates to `/web/snapshot.php?id=...` to view the full HTML snapshot.
 
 ## Run Arxivr locally
 
@@ -26,3 +28,8 @@ cp .env.example .env
 docker compose up --build
 ```
 And visit `http://localhost:8080`. 
+
+To stop and remove the containers, run
+```
+docker compose down
+```
