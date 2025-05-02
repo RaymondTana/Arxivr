@@ -1,4 +1,4 @@
-version: "3.9"
+# version: "3.9"
 services:
   db:
     image: postgres:16
@@ -6,13 +6,17 @@ services:
     env_file: .env
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d
   web:
-    image: php:8.3-apache
+    build: ./web
     volumes:
-      - ./web:/var/www/html:ro
+      - ./web:/var/www/html
+      - ./shared/queue:/queue
+    ports:
+      - "8080:80"
     env_file: .env
-    ports: ["8080:80"]
-    depends_on: [db]
+    depends_on:
+      - db
   fetcher:
     build: ./fetcher
     env_file: .env

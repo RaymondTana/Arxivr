@@ -1,20 +1,27 @@
 <?php require 'config.php'; ?>
-<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="utf-8"><title>Mini‑Archive</title></head>
+<!doctype html><html><head><meta charset="utf-8"><title>Mini‑Archive</title></head>
 <body>
-<h1>Archive a page</h1>
+<h1>Mini‑Archive</h1>
+<?php
+if (!empty($_GET['queued']) && isset($_GET['url'])):
+  $st = $pdo->prepare('SELECT id FROM pages WHERE url = ?');
+  $st->execute([$_GET['url']]);
+  $pid = $st->fetchColumn();
+?>
+  <p style="color: green;">
+    Successfully queued snapshot of <strong><?=htmlspecialchars($_GET['url'])?></strong>.<br>
+    It may take a few seconds to appear. <a href="timeline.php?page=<?=$pid?>">View timeline</a>
+  </p>
+<?php endif; ?>
 <form action="archive.php" method="post">
-   <input type="url" name="url" placeholder="https://example.com" required>
-   <button type="submit">Save now</button>
+  <input type="url" name="url" placeholder="https://example.com" required style="width:60%">
+  <button>Archive now</button>
 </form>
 <hr>
-<h2>Existing snapshots</h2>
+<h2>Tracked URLs</h2>
 <?php
-$stmt = $pdo->query("SELECT p.url, s.id, s.fetched_at FROM snapshots s JOIN pages p ON p.id=s.page_id ORDER BY s.fetched_at DESC LIMIT 50");
-foreach ($stmt as $row) {
-  printf('<p><a href="snapshot.php?id=%d">%s</a> (%s)</p>',
-     $row['id'], htmlspecialchars($row['url']), $row['fetched_at']);
+foreach($pdo->query("SELECT id,url FROM pages ORDER BY created_at DESC LIMIT 50") as $row){
+  printf('<p><a href="timeline.php?page=%d">%s</a></p>', $row['id'], htmlspecialchars($row['url']));
 }
 ?>
 </body></html>

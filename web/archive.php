@@ -1,14 +1,10 @@
 <?php require 'config.php';
 $url = trim($_POST['url'] ?? '');
-if (!filter_var($url, FILTER_VALIDATE_URL)) {
-  die('Invalid URL');
-}
+if(!filter_var($url, FILTER_VALIDATE_URL)) die('Bad URL');
 $pdo->beginTransaction();
-$pageId = $pdo->prepare('INSERT INTO pages(url) VALUES(?) ON CONFLICT (url) DO UPDATE SET url = EXCLUDED.url RETURNING id');
-$pageId->execute([$url]);
-$pageId = $pageId->fetchColumn();
+$st=$pdo->prepare('INSERT INTO pages(url) VALUES(?) ON CONFLICT(url) DO UPDATE SET url=EXCLUDED.url RETURNING id');
+$st->execute([$url]);
+$pageId=$st->fetchColumn();
 $pdo->commit();
-
-// queue job (naive, for now)
 file_put_contents('/queue/jobs', json_encode(['page_id'=>$pageId,'url'=>$url])."\n", FILE_APPEND);
-header('Location: index.php');
+header('Location: index.php?queued=1&url=' . urlencode($url));
